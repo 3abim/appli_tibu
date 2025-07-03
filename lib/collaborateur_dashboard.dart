@@ -20,16 +20,14 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
   String email = "";
   String entreprise = "";
   int pas = 0;
-  int objectif = 0;
+  int objectif = 10000; // Valeur par défaut
   double euros = 0.0;
   int classement = 0;
   List<Map<String, dynamic>> classementList = [];
   int objectifPerso = 10000;
 
-  int classementTabIndex = 0; // 0 = aujourd'hui, 1 = semaine, 2 = mois
-
+  int classementTabIndex = 0;
   StreamSubscription<StepCount>? _stepCountStream;
-
   bool isLoadingClassement = false;
 
   @override
@@ -38,7 +36,7 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
     _initPedometer();
     _fetchCollaborateurData();
     _loadObjectifPerso();
-    _fetchClassement(); // Ajouté pour charger le classement du jour au démarrage
+    _fetchClassement();
   }
 
   @override
@@ -50,69 +48,93 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
   void _initPedometer() {
     _stepCountStream = Pedometer.stepCountStream.listen(
       (StepCount event) {
+        if (!mounted) return; // Sécurité : ne pas mettre à jour si la page n'est plus affichée
         setState(() {
           pas = event.steps;
         });
       },
-      onError: (error) {},
+      onError: (error) {
+        // Optionnel : gérer l'erreur du podomètre
+      },
       cancelOnError: true,
     );
   }
 
   Future<void> _fetchCollaborateurData() async {
     final url = Uri.parse('http://10.0.2.2:9090/api/collaborateur/dashboard');
-    final response = await http.get(
-      url,
-      headers: {
-        'Authorization': 'Bearer ${widget.token}',
-        'Content-Type': 'application/json',
-      },
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      setState(() {
-        nom = data['nom'] ?? '';
-        email = data['email'] ?? '';
-        entreprise = data['entreprise'] ?? '';
-        objectifPerso = data['objectifPerso'] ?? 0;
-        euros = (data['euros'] ?? 0).toDouble();
-        classement = data['classement'] ?? 0;
-        if (data['pas'] != null) pas = data['pas'];
-      });
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          nom = data['nom'] ?? '';
+          email = data['email'] ?? '';
+          entreprise = data['entreprise'] ?? '';
+          objectifPerso = data['objectifPerso'] ?? 10000;
+          euros = (data['euros'] ?? 0).toDouble();
+          classement = data['classement'] ?? 0;
+          if (data['pas'] != null) pas = data['pas'];
+        });
+      }
+    } catch (e) {
+      // Gérer les erreurs réseau
     }
   }
 
   Future<void> _loadObjectifPerso() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       objectifPerso = prefs.getInt('objectifPas') ?? objectif;
     });
   }
 
   Future<void> _fetchClassement() async {
+    if (!mounted) return;
     setState(() {
       isLoadingClassement = true;
-      classementList = []; // Vide la liste pour effet immédiat
+      classementList = [];
     });
+
     String period = "jour";
     if (classementTabIndex == 1) period = "semaine";
     if (classementTabIndex == 2) period = "mois";
+
     final url = Uri.parse('http://10.0.2.2:9090/api/collaborateur/classement?periode=$period');
-    final response = await http.get(
-      url,
-      headers: {
-        'Authorization': 'Bearer ${widget.token}',
-        'Content-Type': 'application/json',
-      },
-    );
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      setState(() {
-        classementList = List<Map<String, dynamic>>.from(data['classementList'] ?? []);
-        classement = data['classement'] ?? 0;
-        isLoadingClassement = false;
-      });
-    } else {
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          classementList = List<Map<String, dynamic>>.from(data['classementList'] ?? []);
+          classement = data['classement'] ?? 0;
+          isLoadingClassement = false;
+        });
+      } else {
+        setState(() {
+          isLoadingClassement = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
       setState(() {
         isLoadingClassement = false;
       });
@@ -139,7 +161,8 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
                 },
               ),
               Positioned(
-                right: 8, top: 8,
+                right: 8,
+                top: 8,
                 child: Container(
                   padding: const EdgeInsets.all(2),
                   decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
@@ -148,21 +171,39 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
               ),
             ],
           ),
-                    GestureDetector(
-            onTap: () {
-              // Navigation vers la page Compte
-              Navigator.pushNamed(
-                context,
-                '/compte',
-                arguments: {
-                  'nom': nom,
-                  'email': email,
-                  'entreprise': entreprise,
-                },
-              );
-            },
-            child: CircleAvatar(child: Text(nom.isNotEmpty ? nom[0] : '?')),
-          ),
+         // DANS LE FICHIER `collaborateur_dashboard.dart`
+PopupMenuButton<String>(
+  icon: CircleAvatar(
+    backgroundColor: Colors.grey[200],
+    child: Text(nom.isNotEmpty ? nom[0] : '?', style: const TextStyle(color: Colors.black)),
+  ),
+  onSelected: (value) {
+    if (value == 'account') {
+      Navigator.pushNamed(
+        context,
+        '/compte',
+        arguments: {
+          'nom': nom,
+          'email': email,
+          'entreprise': entreprise,
+        },
+      );
+    } else if (value == 'logout') {
+      // Pour se déconnecter, on efface toutes les pages et on retourne à la page de bienvenue
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    }
+  },
+  itemBuilder: (context) => [
+    const PopupMenuItem(
+      value: 'account',
+      child: Text('Compte'),
+    ),
+    const PopupMenuItem(
+      value: 'logout',
+      child: Text('Se déconnecter'),
+    ),
+  ],
+),
           const SizedBox(width: 16),
         ],
       ),
@@ -172,10 +213,7 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
           // Bonjour
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5FAFF),
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: const Color(0xFFF5FAFF), borderRadius: BorderRadius.circular(8)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -190,10 +228,7 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
           // Vos pas aujourd'hui
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: pantone2935C,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: pantone2935C, borderRadius: BorderRadius.circular(8)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -225,10 +260,7 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
           // Vos gains
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: pantone368C,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: pantone368C, borderRadius: BorderRadius.circular(8)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -242,16 +274,9 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: (pas % 1000) / 1000,
-                  backgroundColor: Colors.white24,
-                  color: Colors.black,
-                ),
+                LinearProgressIndicator(value: (pas % 1000) / 1000, backgroundColor: Colors.white24, color: Colors.black),
                 const SizedBox(height: 4),
-                Text(
-                  "Encore ${1000 - (pas % 1000)} pas pour gagner 1€ supplémentaire",
-                  style: const TextStyle(color: Colors.white),
-                ),
+                Text("Encore ${1000 - (pas % 1000)} pas pour gagner 1€ supplémentaire", style: const TextStyle(color: Colors.white)),
               ],
             ),
           ),
@@ -260,10 +285,7 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
           // Classement des marcheurs
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: pantone130C,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            decoration: BoxDecoration(color: pantone130C, borderRadius: BorderRadius.circular(8)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -273,94 +295,64 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _ClassementTab(
-                      "Aujourd'hui",
-                      classementTabIndex == 0,
-                      onTap: () {
-                        print('Onglet Aujourd\'hui cliqué');
-                        setState(() {
-                          classementTabIndex = 0;
-                        });
-                        _fetchClassement();
-                      },
-                    ),
-                    _ClassementTab(
-                      "Cette semaine",
-                      classementTabIndex == 1,
-                      onTap: () {
-                        print('Onglet Cette semaine cliqué');
-                        setState(() {
-                          classementTabIndex = 1;
-                        });
-                        _fetchClassement();
-                      },
-                    ),
-                    _ClassementTab(
-                      "Ce mois",
-                      classementTabIndex == 2,
-                      onTap: () {
-                        print('Onglet Ce mois cliqué');
-                        setState(() {
-                          classementTabIndex = 2;
-                        });
-                        _fetchClassement();
-                      },
-                    ),
+                    _ClassementTab("Aujourd'hui", classementTabIndex == 0, onTap: () {
+                      setState(() {
+                        classementTabIndex = 0;
+                      });
+                      _fetchClassement();
+                    }),
+                    _ClassementTab("Cette semaine", classementTabIndex == 1, onTap: () {
+                      setState(() {
+                        classementTabIndex = 1;
+                      });
+                      _fetchClassement();
+                    }),
+                    _ClassementTab("Ce mois", classementTabIndex == 2, onTap: () {
+                      setState(() {
+                        classementTabIndex = 2;
+                      });
+                      _fetchClassement();
+                    }),
                   ],
                 ),
                 const SizedBox(height: 8),
                 if (isLoadingClassement)
-                  const Center(child: CircularProgressIndicator())
+                  const Center(child: CircularProgressIndicator(color: Colors.white))
                 else
                   ...classementList.map((item) => _ClassementItem(
-                    nom: item["nom"] ?? "",
-                    entreprise: item["entreprise"] ?? "",
-                    pas: item["pas"] ?? 0,
-                    isUser: (item["nom"] ?? "").toString().toLowerCase().contains(nom.toLowerCase()),
-                    rang: item["rang"] ?? 0,
-                  )),
+                        nom: item["nom"] ?? "",
+                        entreprise: item["entreprise"] ?? "",
+                        pas: item["pas"] ?? 0,
+                        isUser: item["nom"] == nom, // Comparaison exacte plus fiable
+                        rang: item["rang"] ?? 0,
+                      )),
               ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              print('Test bouton cliqué');
-            },
-            child: const Text('Test bouton'),
-          ),
         ],
       ),
+      // --- CORRECTION MAJEURE ICI ---
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: 0,
         selectedItemColor: const Color(0xFF3575D3),
         unselectedItemColor: Colors.grey,
         onTap: (index) {
-          if (index == 0) {
-            Navigator.pushReplacementNamed(context, '/dashboard');
-          } else if (index == 1) {
-            Navigator.pushNamed(
+          if (index == 1) {
+            Navigator.pushReplacementNamed(
               context,
               '/progress',
-              arguments: {
-                'nom': nom,
-                'email': email,
-                'entreprise': entreprise,
-              },
+              arguments: {'nom': nom, 'email': email, 'entreprise': entreprise , 'token': widget.token},
             );
-           } else if (index == 2) {
-            // On passe les données à la page des réglages
+          } else if (index == 2) {
+            // Navigation vers Réglages en passant les arguments
             Navigator.pushReplacementNamed(
               context,
               '/settings',
-              arguments: {
-                'nom': nom,
-                'email': email,
-                'entreprise': entreprise,
-              },
+              arguments: {'token':widget.token,  'nom': nom, 'email': email, 'entreprise': entreprise},
             );
           }
         },
-        
+        // --- `items` doit être une propriété de BottomNavigationBar ---
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Dashboard"),
           BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: "Progrès"),
@@ -390,10 +382,7 @@ class _ClassementTab extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: TextStyle(
-            color: selected ? Colors.black : Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: selected ? Colors.black : Colors.white, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -421,7 +410,8 @@ class _ClassementItem extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isUser ? Colors.white.withOpacity(0.7) : Colors.transparent,
+        // Correction de `withOpacity` qui est obsolète
+        color: isUser ? Colors.white.withAlpha(179) : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border: isUser ? Border.all(color: Colors.purple.shade100) : null,
       ),
@@ -441,10 +431,7 @@ class _ClassementItem extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            pas.toString(),
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
+          Text(pas.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(width: 4),
           const Text("pas"),
         ],
@@ -453,9 +440,6 @@ class _ClassementItem extends StatelessWidget {
   }
 }
 
-// Pantone 2935C (bleu) : #0057B8
 const pantone2935C = Color(0xFF0057B8);
-// Pantone 368C (vert) : #39B54A
 const pantone368C = Color(0xFF39B54A);
-// Pantone 130C (orange) : #F2A900
 const pantone130C = Color(0xFFF2A900);

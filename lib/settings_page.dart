@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsPage extends StatefulWidget {
+  final String token;
   final String nom;
   final String email;
   final String entreprise;
 
   const SettingsPage({
     super.key,
+     required this.token,
     required this.nom,
     required this.email,
     required this.entreprise,
@@ -48,6 +50,7 @@ class _SettingsPageState extends State<SettingsPage> {
       await prefs.setInt('objectifPas', int.parse(_pasQuotidienController.text));
       await prefs.setInt('objectifCalories', int.parse(_caloriesController.text));
       await prefs.setDouble('objectifDistance', double.parse(_distanceController.text));
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Objectifs sauvegardés !')),
       );
@@ -102,22 +105,38 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
             ],
           ),
-           GestureDetector(
-            onTap: () {
-              // On utilise les informations reçues via le widget
-              Navigator.pushNamed(
-                context,
-                '/compte',
-                arguments: {
-                  'nom': widget.nom,
-                  'email': widget.email,
-                  'entreprise': widget.entreprise,
-                },
-              );
-            },
-            // On affiche la première lettre du nom de l'utilisateur
-            child: CircleAvatar(child: Text(widget.nom.isNotEmpty ? widget.nom[0] : '?')),
-          ),
+          // DANS LE FICHIER `settings_page.dart`
+PopupMenuButton<String>(
+  icon: CircleAvatar(
+    backgroundColor: Colors.grey[200],
+    child: Text(widget.nom.isNotEmpty ? widget.nom[0] : '?', style: const TextStyle(color: Colors.black)),
+  ),
+  onSelected: (value) {
+    if (value == 'account') {
+      Navigator.pushNamed(
+        context,
+        '/compte',
+        arguments: {
+          'nom': widget.nom,
+          'email': widget.email,
+          'entreprise': widget.entreprise,
+        },
+      );
+    } else if (value == 'logout') {
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+    }
+  },
+  itemBuilder: (context) => [
+    const PopupMenuItem(
+      value: 'account',
+      child: Text('Compte'),
+    ),
+    const PopupMenuItem(
+      value: 'logout',
+      child: Text('Se déconnecter'),
+    ),
+  ],
+),
           const SizedBox(width: 16),
         ],
       ),
@@ -205,12 +224,23 @@ class _SettingsPageState extends State<SettingsPage> {
         unselectedItemColor: Colors.grey,
         onTap: (index) {
           if (index == 0) {
-            Navigator.pushReplacementNamed(context, '/dashboard');
+            Navigator.pushReplacementNamed(
+              context,
+              '/dashboard',
+              arguments: {'token': widget.token},
+            );
           } else if (index == 1) {
-            Navigator.pushReplacementNamed(context, '/progress');
-          } else if (index == 2) {
-            // Déjà sur Réglages
-          }
+        Navigator.pushReplacementNamed(
+          context,
+          '/progress',
+          arguments: {
+            'token': widget.token,
+            'nom': widget.nom,
+            'email': widget.email,
+            'entreprise': widget.entreprise,
+          },
+        );
+          } 
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Dashboard"),

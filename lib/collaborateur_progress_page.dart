@@ -1,26 +1,29 @@
 // collaborateur_progress_page.dart
 
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:pedometer/pedometer.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class CollaborateurProgressPage extends StatefulWidget {
-  final int objectifPas;
-  final int objectifCalories;
-  final double objectifDistance;
+  final String token;
   final String nom;
   final String email;
   final String entreprise;
+  final int objectifPas;
+  final int objectifCalories;
+  final double objectifDistance;
 
   const CollaborateurProgressPage({
     super.key,
-    required this.objectifPas,
-    required this.objectifCalories,
-    required this.objectifDistance,
+    required this.token,
     required this.nom,
     required this.email,
     required this.entreprise,
+    required this.objectifPas,
+    required this.objectifCalories,
+    required this.objectifDistance,
   });
 
   @override
@@ -28,14 +31,18 @@ class CollaborateurProgressPage extends StatefulWidget {
 }
 
 class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
+  int _progressTabIndex = 0;
+  bool _isLoading = false;
+
   int pas = 0;
   double distance = 0.0;
   int calories = 0;
-  StreamSubscription<StepCount>? _stepCountStream;
 
   late int objectifPas;
   late int objectifCalories;
   late double objectifDistance;
+
+  StreamSubscription<StepCount>? _stepCountStream;
 
   @override
   void initState() {
@@ -43,8 +50,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
     objectifPas = widget.objectifPas;
     objectifCalories = widget.objectifCalories;
     objectifDistance = widget.objectifDistance;
-    _initPedometer();
-    loadObjectives();
+    _fetchProgressData();
   }
 
   @override
@@ -53,38 +59,79 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
     super.dispose();
   }
 
-  void _initPedometer() {
-    _stepCountStream = Pedometer.stepCountStream.listen(
-      (StepCount event) {
-        if (!mounted) return;
-        setState(() {
-          pas = event.steps;
-          distance = _calculateDistance(pas);
-          calories = _calculateCalories(pas);
-        });
-      },
-      onError: (error) {},
-      cancelOnError: true,
-    );
+  void _initPedometerForToday() {
+    _stepCountStream?.cancel();
+    if (_progressTabIndex == 0) {
+      _stepCountStream = Pedometer.stepCountStream.listen(
+        (StepCount event) {
+          if (!mounted) return;
+          setState(() {
+            pas = event.steps;
+            distance = _calculateDistance(pas);
+            calories = _calculateCalories(pas);
+          });
+        },
+        onError: (error) {},
+        cancelOnError: true,
+      );
+    }
   }
 
-  double _calculateDistance(int steps) {
-    return (steps * 0.0008);
-  }
-
-  int _calculateCalories(int steps) {
-    return (steps * 0.04).round();
-  }
-
-  void loadObjectives() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> _fetchProgressData() async {
     if (!mounted) return;
     setState(() {
-      objectifPas = prefs.getInt('objectifPas') ?? objectifPas;
-      objectifCalories = prefs.getInt('objectifCalories') ?? objectifCalories;
-      objectifDistance = prefs.getDouble('objectifDistance') ?? objectifDistance;
+      _isLoading = true;
     });
+
+    if (_progressTabIndex == 0) {
+      _initPedometerForToday();
+      setState(() {
+        _isLoading = false;
+      });
+      return;
+    }
+
+    _stepCountStream?.cancel();
+
+    String period = "semaine";
+    if (_progressTabIndex == 2) period = "mois";
+
+    final url = Uri.parse('http://10.0.2.2:9090/api/collaborateur/progress?periode=$period');
+    
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          pas = data['pas_total'] ?? 0;
+          distance = (data['distance_totale'] ?? 0.0).toDouble();
+          calories = data['calories_totales'] ?? 0;
+          objectifPas = data['objectif_pas'] ?? widget.objectifPas * 7;
+          objectifCalories = data['objectif_calories'] ?? widget.objectifCalories * 7;
+          objectifDistance = (data['objectif_distance'] ?? widget.objectifDistance * 7).toDouble();
+        });
+      }
+    } catch (e) {
+      // Gérer l'erreur
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
+
+  double _calculateDistance(int steps) => (steps * 0.0008);
+  int _calculateCalories(int steps) => (steps * 0.04).round();
 
   @override
   Widget build(BuildContext context) {
@@ -93,6 +140,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
     double percentDistance = objectifDistance > 0 ? (distance / objectifDistance).clamp(0.0, 1.0) : 0.0;
 
     return Scaffold(
+      // --- VOTRE APPBAR EST DE RETOUR ---
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 1,
@@ -101,7 +149,6 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
           PopupMenuButton<String>(
             icon: CircleAvatar(
               backgroundColor: Colors.grey[200],
-              // --- CORRECTION : On utilise `widget.nom` pour accéder à la vraie donnée
               child: Text(widget.nom.isNotEmpty ? widget.nom[0] : '?', style: const TextStyle(color: Colors.black)),
             ),
             onSelected: (value) {
@@ -110,7 +157,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                   context,
                   '/compte',
                   arguments: {
-                    // --- CORRECTION : On passe les vraies données à la page compte
+                    'token': widget.token,
                     'nom': widget.nom,
                     'email': widget.email,
                     'entreprise': widget.entreprise,
@@ -141,61 +188,92 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
           const Text("Suivez vos objectifs et vos accomplissements", style: TextStyle(color: Colors.grey)),
           const SizedBox(height: 16),
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _ProgressTab("Aujourd'hui", true),
-              _ProgressTab("Cette semaine", false),
-              _ProgressTab("Ce mois", false),
+              _ProgressTab(
+                "Aujourd'hui",
+                _progressTabIndex == 0,
+                onTap: () {
+                  setState(() { _progressTabIndex = 0; });
+                  _fetchProgressData();
+                },
+              ),
+              _ProgressTab(
+                "Cette semaine",
+                _progressTabIndex == 1,
+                onTap: () {
+                  setState(() { _progressTabIndex = 1; });
+                  _fetchProgressData();
+                },
+              ),
+              _ProgressTab(
+                "Ce mois",
+                _progressTabIndex == 2,
+                onTap: () {
+                  setState(() { _progressTabIndex = 2; });
+                  _fetchProgressData();
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          _ProgressCard(
-            icon: Icons.adjust,
-            iconColor: Colors.blue,
-            title: "Pas quotidiens",
-            value: pas.toString(),
-            objectif: objectifPas.toString(),
-            percent: percentPas,
-            unite: "pas",
-            reste: "${(objectifPas - pas) >= 0 ? objectifPas - pas : 0} pas restants",
-          ),
-          _ProgressCard(
-            icon: Icons.trending_up,
-            iconColor: Colors.orange,
-            title: "Calories brûlées",
-            value: calories.toString(),
-            objectif: objectifCalories.toString(),
-            percent: percentCalories,
-            unite: "kcal",
-            reste: "${(objectifCalories - calories) >= 0 ? objectifCalories - calories : 0} kcal restants",
-          ),
-          _ProgressCard(
-            icon: Icons.calendar_today,
-            iconColor: Colors.green,
-            title: "Distance parcourue",
-            value: distance.toStringAsFixed(2),
-            objectif: objectifDistance.toStringAsFixed(1),
-            percent: percentDistance,
-            unite: "km",
-            reste: "${((objectifDistance - distance) >= 0 ? objectifDistance - distance : 0).toStringAsFixed(2)} km restants",
-          ),
+          if (_isLoading)
+            const Center(child: Padding(padding: EdgeInsets.all(32.0), child: CircularProgressIndicator()))
+          else
+            Column(
+              children: [
+                _ProgressCard(
+                  icon: Icons.adjust,
+                  iconColor: Colors.blue,
+                  title: _progressTabIndex == 0 ? "Pas quotidiens" : "Total de pas",
+                  value: pas.toString(),
+                  objectif: objectifPas.toString(),
+                  percent: percentPas,
+                  unite: "pas",
+                  reste: "${(objectifPas - pas) >= 0 ? objectifPas - pas : 0} pas restants",
+                ),
+                _ProgressCard(
+                  icon: Icons.trending_up,
+                  iconColor: Colors.orange,
+                  title: "Calories brûlées",
+                  value: calories.toString(),
+                  objectif: objectifCalories.toString(),
+                  percent: percentCalories,
+                  unite: "kcal",
+                  reste: "${(objectifCalories - calories) >= 0 ? objectifCalories - calories : 0} kcal restants",
+                ),
+                _ProgressCard(
+                  icon: Icons.calendar_today,
+                  iconColor: Colors.green,
+                  title: "Distance parcourue",
+                  value: distance.toStringAsFixed(2),
+                  objectif: objectifDistance.toStringAsFixed(1),
+                  percent: percentDistance,
+                  unite: "km",
+                  reste: "${((objectifDistance - distance) >= 0 ? objectifDistance - distance : 0).toStringAsFixed(2)} km restants",
+                ),
+              ],
+            )
         ],
       ),
+      // --- VOTRE BOTTOMNAVBAR EST DE RETOUR ---
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 1, // Progrès = 1
+        currentIndex: 1,
         selectedItemColor: const Color(0xFF3575D3),
         unselectedItemColor: Colors.grey,
         onTap: (index) {
           if (index == 0) {
-            // Le dashboard récupère ses propres infos via le token, donc pas besoin d'arguments ici
-            Navigator.pushReplacementNamed(context, '/dashboard');
-          } else if (index == 1) {
-            // Déjà sur Progrès
+            Navigator.pushReplacementNamed(
+              context,
+              '/dashboard',
+              arguments: {'token': widget.token},
+            );
           } else if (index == 2) {
-            // --- CORRECTION : On passe les arguments à la page settings
             Navigator.pushReplacementNamed(
               context,
               '/settings',
               arguments: {
+                'token': widget.token,
                 'nom': widget.nom,
                 'email': widget.email,
                 'entreprise': widget.entreprise,
@@ -216,22 +294,28 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
 class _ProgressTab extends StatelessWidget {
   final String label;
   final bool selected;
-  const _ProgressTab(this.label, this.selected);
+  final VoidCallback onTap;
+
+  const _ProgressTab(this.label, this.selected, {required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: selected ? Colors.white : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected ? Colors.black : Colors.grey,
-          fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.blue.withAlpha(50) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? Colors.blue : Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.blue : Colors.grey.shade700,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );
@@ -249,6 +333,7 @@ class _ProgressCard extends StatelessWidget {
   final String reste;
 
   const _ProgressCard({
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.title,
@@ -264,6 +349,7 @@ class _ProgressCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -273,30 +359,33 @@ class _ProgressCard extends StatelessWidget {
               children: [
                 Icon(icon, color: iconColor),
                 const SizedBox(width: 8),
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                 const SizedBox(width: 8),
                 Text("/ $objectif $unite", style: const TextStyle(fontSize: 16, color: Colors.grey)),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             LinearProgressIndicator(
               value: percent,
               backgroundColor: Colors.grey[200],
-              color: Colors.black,
+              color: iconColor,
               minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
             ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("${(percent * 100).toStringAsFixed(0)}% de l'objectif", style: const TextStyle(color: Colors.grey)),
-                Text(reste, style: const TextStyle(color: Colors.grey)),
+                Text("${(percent * 100).toStringAsFixed(0)}% de l'objectif", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(reste, style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
           ],

@@ -1,33 +1,36 @@
+// main.dart
+
+// --- IMPORTS CORRIGÉS ---
 import 'package:appli_tibu/collaborateur_login_page.dart';
 import 'package:flutter/material.dart';
-import 'admin_login_page.dart';
-import 'package:appli_tibu/collaborateur_dashboard.dart'; // Supposons que c'est le bon chemin
+import 'package:appli_tibu/collaborateur_dashboard.dart';
 import 'package:appli_tibu/collaborateur_progress_page.dart';
 import 'package:appli_tibu/settings_page.dart';
 import 'package:appli_tibu/notifications_page.dart';
 import 'package:appli_tibu/compte_page.dart';
+import 'package:appli_tibu/admin_login_page.dart';
+import 'package:appli_tibu/admin_shell_page.dart';
+// Make sure that the file 'lib/admin/admin_shell_page.dart' exists and contains a class named 'AdminShellPage'
 
-// 2. FONCTION MAIN
 void main() {
-  runApp(const MyApp()); // On lance le widget principal MyApp
+  runApp(const MyApp());
 }
 
-// 3. WIDGET PRINCIPAL DE L'APPLICATION
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false, // Pour enlever la bannière "DEBUG"
       title: 'Step Up',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3575D3)), // J'ai mis votre bleu
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3575D3)),
         useMaterial3: true,
-        // Style global pour les boutons pour correspondre à votre design
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0057B8), // Votre couleur bleue principale
-            foregroundColor: Colors.white, // Texte en blanc
+            backgroundColor: const Color(0xFF0057B8),
+            foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
@@ -35,30 +38,21 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      // On commence sur la page de bienvenue
       initialRoute: '/',
-      
-      // 4. GESTION DES ROUTES (C'EST LA CORRECTION LA PLUS IMPORTANTE)
-      // C'est ici qu'on définit comment naviguer entre les pages.
       routes: {
+        // --- ROUTES PUBLIQUES ---
         '/': (context) => const WelcomePage(),
         '/register': (context) => const CollaborateurLoginPage(),
         '/admin-login': (context) => const AdminLoginPage(),
-        
-        // --- ROUTE DASHBOARD ---
+
+        // --- ROUTES COLLABORATEUR (privées) ---
         '/dashboard': (context) {
-          // On récupère le token passé depuis la page de login
           final arguments = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>?;
-          final token = arguments?['token'] ?? ''; // Sécurité pour éviter le null
+          final token = arguments?['token'] ?? '';
           return CollaborateurDashboard(token: token);
         },
-        
-        // --- ROUTE NOTIFICATIONS ---
         '/notifications': (context) => const NotificationsPage(),
-        
-        // --- ROUTE COMPTE ---
         '/compte': (context) {
-          // On récupère les informations de l'utilisateur passées en argument
           final arguments = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
           return ComptePage(
             nom: arguments['nom'],
@@ -66,35 +60,34 @@ class MyApp extends StatelessWidget {
             entreprise: arguments['entreprise'],
           );
         },
-
-        // --- ROUTE PROGRÈS ---
         '/progress': (context) {
-  // On récupère les informations de l'utilisateur
-  final arguments = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-  
-  // ET MAINTENANT ON LES UTILISE !
-  return CollaborateurProgressPage(
-    // On passe les vraies infos
-    nom: arguments['nom'],
-    email: arguments['email'],
-    entreprise: arguments['entreprise'],
-
-    // On peut garder les objectifs en dur pour le moment
-    objectifPas: 10000,
-    objectifCalories: 400,
-    objectifDistance: 7.0,
-  );
-},
-
-        // --- ROUTE RÉGLAGES ---
-        '/settings': (context) {
-          // On récupère les infos de l'utilisateur
           final arguments = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-          // On les passe à la page SettingsPage qui en a besoin pour le bouton "Compte"
-          return SettingsPage(
+          return CollaborateurProgressPage(
+            token: arguments['token'],
             nom: arguments['nom'],
             email: arguments['email'],
             entreprise: arguments['entreprise'],
+            objectifPas: 10000,
+            objectifCalories: 400,
+            objectifDistance: 7.0,
+          );
+        },
+        '/settings': (context) {
+          final arguments = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return SettingsPage(
+            token: arguments['token'],
+            nom: arguments['nom'],
+            email: arguments['email'],
+            entreprise: arguments['entreprise'],
+          );
+        },
+
+        // --- ROUTES ADMIN (privées) ---
+        '/admin/shell': (context) {
+          final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+          return AdminShellPage(
+            token: args['token'] ?? '',
+            role: args['role'] ?? 'admin',
           );
         },
       },
@@ -102,8 +95,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// 5. PAGE DE BIENVENUE (WelcomePage)
-// Ce widget est correct, je le garde tel quel.
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
 
@@ -136,7 +127,6 @@ class WelcomePage extends StatelessWidget {
                   onPressed: () {
                     Navigator.pushNamed(context, '/register');
                   },
-                  // Le style est maintenant défini dans le thème global
                   child: const Text('Commencer', style: TextStyle(fontSize: 18)),
                 ),
                 const SizedBox(height: 20),
