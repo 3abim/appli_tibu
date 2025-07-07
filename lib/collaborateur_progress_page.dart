@@ -96,7 +96,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
     String period = "semaine";
     if (_progressTabIndex == 2) period = "mois";
 
-    final url = Uri.parse('http://10.0.2.2:9090/api/collaborateur/progress?periode=$period');
+    final url = Uri.parse('http://10.0.2.2:9091/api/collaborateur/progress?periode=$period');
     
     try {
       final response = await http.get(
