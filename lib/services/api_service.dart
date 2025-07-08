@@ -38,7 +38,7 @@ class ApiService {
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     };
-    
+     await _loadToken();
     if (_token != null) {
       headers['Authorization'] = 'Bearer $_token';
     }
@@ -79,6 +79,25 @@ class ApiService {
   }
 }
 
+Future<dynamic> loginAdmin(String email, String password) async {
+    final uri = Uri.parse('$_baseUrl/api/auth/admin/login');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json; charset=utf-8'},
+      body: jsonEncode({'email': email, 'password': password}),
+    );
+    
+    if (response.statusCode == 200) {
+      final data = json.decode(utf8.decode(response.bodyBytes));
+      // On sauvegarde le token directement après une connexion réussie
+      await _saveToken(data['token']);
+      return data;
+    } else {
+      // Lance une exception avec le message du serveur s'il existe
+      final errorBody = json.decode(utf8.decode(response.bodyBytes));
+      throw Exception(errorBody['message'] ?? 'Échec de la connexion admin');
+    }
+  }
   Future<dynamic> getAdminDashboardStats() async {
   await _loadToken();
   try {

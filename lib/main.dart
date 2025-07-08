@@ -4,7 +4,9 @@ import 'collaborateur_dashboard.dart';
 import 'admin_login_page.dart';
 import 'admin_dashboard_page.dart';
 import 'admin_shell_page.dart';
-import 'settings_page.dart'; 
+import 'settings_page.dart';
+import 'collaborateur_progress_page.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -35,20 +37,15 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const CollaborateurLoginPage(),
         '/admin-login': (context) => const AdminLoginPage(),
         
-        // Route Dashboard Collaborateur
         '/dashboard': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
-          
-          // Gestion flexible des arguments
           String? token;
           if (args is Map<String, dynamic>) {
-            token = args['token'] ?? (args['user'] as Map<String, dynamic>?)?['token'];
+            token = args['token'];
           }
-          
           if (token != null) {
             return CollaborateurDashboard(token: token);
           }
-          
           return Scaffold(
             body: Center(
               child: Column(
@@ -67,7 +64,6 @@ class MyApp extends StatelessWidget {
           );
         },
         
-        // Route Admin
         '/admin/shell': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
           return AdminShellPage(
@@ -76,7 +72,6 @@ class MyApp extends StatelessWidget {
           );
         },
         
-        // Routes supplémentaires conservées
         '/notifications': (context) => const NotificationsPage(),
         '/compte': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
@@ -86,12 +81,10 @@ class MyApp extends StatelessWidget {
             entreprise: args['entreprise'] ?? '',
           );
         },
-        '/progress': (context) => const CollaborateurProgressPage(),
-        '/settings': (context) {
-          // 1. On récupère les arguments
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
 
-          return SettingsPage(
+        '/progress': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+          return CollaborateurProgressPage(
             token: args['token'] ?? '',
             nom: args['nom'] ?? 'Non défini',
             email: args['email'] ?? '',
@@ -99,6 +92,15 @@ class MyApp extends StatelessWidget {
           );
         },
 
+        '/settings': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+          return SettingsPage(
+            token: args['token'] ?? '',
+            nom: args['nom'] ?? 'Non défini',
+            email: args['email'] ?? '',
+            entreprise: args['entreprise'] ?? '',
+          );
+        },
       },
     );
   }
@@ -143,14 +145,7 @@ class ComptePage extends StatelessWidget {
   );
 }
 
-class CollaborateurProgressPage extends StatelessWidget {
-  const CollaborateurProgressPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Mes Progrès")),
-    body: const Center(child: Text("Page des progrès")),
-  );
-}
+// NOTE : La classe CollaborateurProgressPage a été supprimée d'ici.
 
 // Page d'accueil inchangée
 class WelcomePage extends StatelessWidget {
@@ -204,4 +199,4 @@ class WelcomePage extends StatelessWidget {
       ),
     );
   }
-}
+}                                           

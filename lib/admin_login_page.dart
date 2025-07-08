@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AdminLoginPage extends StatefulWidget {
   const AdminLoginPage({super.key});
@@ -20,46 +19,52 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   Future<void> _login() async {
     if (_isLoading) return;
-    if (_formKey.currentState!.validate()) {
-      setState(() { _isLoading = true; _errorMessage = '';});
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      try {
-      final response = await _apiService.login(
-        _emailController.text,
-        _passwordController.text,
-      );
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List<String> roles = List<String>.from(data['roles'] ?? []);
+    try {
+      final email = _emailController.text;
+      final password = _passwordController.text;
+
+      final data = await _apiService.loginAdmin(email, password);
+      
+      final String token = data['token'];
+      final String role = data['role'];
+
+      if (role == 'ROLE_ADMIN' || role == 'ROLE_SUPER_ADMIN') {
+        if (!mounted) return;
         
-        if (roles.contains('ROLE_ADMIN')) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('token', data['token']);
-          await prefs.setString('user_role', 'ROLE_ADMIN');
+        // ======================= CORRECTION DE LA NAVIGATION =======================
+        // On utilise les vraies valeurs `token` et `role` récupérées de l'API
+        Navigator.pushReplacementNamed(
+          context,
+          '/admin/shell',
+          arguments: {'token': token, 'role': role},
+        );
+        // =========================================================================
 
-          if (!mounted) return;
-          Navigator.pushReplacementNamed(
-            context,
-            '/admin/shell',
-            arguments: {'token': data['token'], 'role': 'ROLE_ADMIN'},
-          );
-        } else {
-          setState(() { _errorMessage = 'Accès non autorisé. Vous n\'êtes pas un administrateur.'; });
-        }
       } else {
-        setState(() { _errorMessage = 'Email ou mot de passe incorrect.'; });
+        setState(() {
+         _errorMessage = 'Accès refusé. Rôle non autorisé.';
+        });
       }
+
     } catch (e) {
-      setState(() { _errorMessage = 'Erreur de connexion. Vérifiez le serveur.'; });
+      setState(() {
+        _errorMessage = e.toString().replaceFirst("Exception: ", ""); // Pour un message plus propre
+      });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
   }
-  }
-
 
   @override
   void dispose() {
@@ -71,11 +76,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Accès Administrateur"),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-      ),
+      backgroundColor: Colors.white,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -83,40 +84,80 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
             key: _formKey,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Image.asset('assets/logo.png', height: 80),
                 const SizedBox(height: 24),
-                const Text('Bienvenue, Administrateur', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const Text(
+                  'ADMINISTRATION',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                ),
                 const SizedBox(height: 8),
-                const Text('Veuillez vous connecter pour continuer.', style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 32),
+                const Text(
+                  'Connectez-vous à votre espace administrateur',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+                const SizedBox(height: 40),
                 TextFormField(
                   controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder(), prefixIcon: Icon(Icons.email_outlined)),
+                  decoration: const InputDecoration(
+                    labelText: 'Email administrateur',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                    prefixIcon: Icon(Icons.email_outlined),
+                  ),
                   keyboardType: TextInputType.emailAddress,
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Veuillez entrer un email';
-                    if (!value.endsWith('@tibu.ma')) return 'L\'email doit se terminer par @tibu.ma';
+                    if (!value.contains('@')) return "Format d'email invalide"; // Validation plus générale
                     return null;
                   },
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Mot de passe', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock_outline)),
+                  decoration: const InputDecoration(
+                    labelText: 'Mot de passe',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
                   obscureText: true,
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Veuillez entrer un mot de passe';
                     return null;
                   },
                 ),
-                const SizedBox(height: 24),
+                 Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {},
+                    child: const Text('Mot de passe oublié ?'),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (_errorMessage.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Text(
+                      _errorMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ),
                 _isLoading
-                    ? const CircularProgressIndicator()
+                    ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(
-                        style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50), backgroundColor: const Color(0xFF3575D3), foregroundColor: Colors.white),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 50),
+                          backgroundColor: const Color(0xFF0057B8),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                         onPressed: _login,
-                        child: const Text('Se connecter'),
+                        child: const Text('Se connecter', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
               ],
             ),
