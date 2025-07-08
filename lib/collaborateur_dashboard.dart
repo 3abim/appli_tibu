@@ -231,8 +231,29 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
         ],
         currentIndex: 0,
         onTap: (index) {
-          // Navigation à implémenter
-        },
+ if (index == 1) { // Index 1 = Progrès
+            Navigator.pushReplacementNamed(
+              context,
+              '/progress',
+              arguments: {
+                'token': widget.token,
+                'nom': nom,
+                'email': email,
+                'entreprise': entreprise,
+              },
+            );
+          } else if (index == 2) { // Index 2 = Paramètres
+            Navigator.pushReplacementNamed(
+              context,
+              '/settings',
+              arguments: {
+                'token': widget.token,
+                'nom': nom,
+                'email': email,
+                'entreprise': entreprise,
+              },
+            );
+          }        },
       ),
     );
   }

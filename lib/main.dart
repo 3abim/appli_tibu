@@ -4,7 +4,7 @@ import 'collaborateur_dashboard.dart';
 import 'admin_login_page.dart';
 import 'admin_dashboard_page.dart';
 import 'admin_shell_page.dart';
-
+import 'settings_page.dart'; 
 void main() {
   runApp(const MyApp());
 }
@@ -87,7 +87,18 @@ class MyApp extends StatelessWidget {
           );
         },
         '/progress': (context) => const CollaborateurProgressPage(),
-        '/settings': (context) => const SettingsPage(),
+        '/settings': (context) {
+          // 1. On récupère les arguments
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>? ?? {};
+
+          return SettingsPage(
+            token: args['token'] ?? '',
+            nom: args['nom'] ?? 'Non défini',
+            email: args['email'] ?? '',
+            entreprise: args['entreprise'] ?? '',
+          );
+        },
+
       },
     );
   }
@@ -138,15 +149,6 @@ class CollaborateurProgressPage extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text("Mes Progrès")),
     body: const Center(child: Text("Page des progrès")),
-  );
-}
-
-class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Paramètres")),
-    body: const Center(child: Text("Page des paramètres")),
   );
 }
 
