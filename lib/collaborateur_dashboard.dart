@@ -257,13 +257,21 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
     final progress = objectifPerso > 0 ? (pas / objectifPerso).clamp(0.0, 1.0) : 0.0;
     
     return Card(
-      color: pantone2935C,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // Ajouté pour harmoniser
-          children: [
-            const Text('Vos pas aujourd\'hui', style: TextStyle(color: Colors.white, fontSize: 18)),
+  color: const Color(0xFF0057B8), // <-- couleur bleue
+  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 0),
+  child: Padding(
+    padding: const EdgeInsets.all(16),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+            const Text(
+              'Vos pas aujourd\'hui',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             Text('Objectif: $objectifPerso pas', style: const TextStyle(color: Colors.white70)),
             const SizedBox(height: 16),
             Center(
