@@ -103,7 +103,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _buildAppBar(),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: const Text('Dashboard Admin'),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF3575D3),
+        elevation: 1,
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
@@ -112,15 +118,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  AppBar _buildAppBar() {
-    return AppBar(
-      title: const Text('Dashboard Admin'),
-      backgroundColor: Colors.white,
-      foregroundColor: const Color(0xFF3575D3),
-      elevation: 1,
-    );
-  }
-  
   Widget _buildErrorView() {
     return Center(
       child: Padding(

@@ -125,8 +125,58 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   // Fonction pour réinitialiser les champs en rechargeant depuis le serveur
-  void _resetObjectives() {
-    _loadObjectivesFromServer();
+   Future<void> _resetObjectives() async {
+    // On demande confirmation à l'utilisateur, c'est une bonne pratique
+    final bool? shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Réinitialiser les objectifs ?'),
+        content: const Text('Vos objectifs personnalisés seront remplacés par les valeurs par défaut.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmer', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    // Si l'utilisateur n'a pas confirmé, on ne fait rien
+    if (shouldReset != true) {
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final url = Uri.parse('http://192.168.11.140:9091/api/objectifs/reset');
+      final response = await http.post(
+        url,
+        headers: {'Authorization': 'Bearer ${widget.token}'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        // Si la réinitialisation a réussi, on recharge les nouvelles données (par défaut) depuis le serveur
+        await _loadObjectivesFromServer();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Objectifs réinitialisés !'), backgroundColor: Colors.blue),
+        );
+      } else {
+        throw Exception('Erreur serveur (${response.statusCode})');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog("Erreur de réinitialisation", e.toString());
+    } finally {
+      if(mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   // Fonction utilitaire pour afficher les erreurs
@@ -143,6 +193,8 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+
+  
   @override
   void dispose() {
     _pasQuotidienController.dispose();
@@ -157,6 +209,7 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.white,
         elevation: 1,
         title: const Text(

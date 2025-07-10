@@ -96,6 +96,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Paramètres & Outils'),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF3575D3),

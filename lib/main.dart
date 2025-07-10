@@ -119,11 +119,11 @@ class NotificationsPage extends StatelessWidget {
   );
 }
 
-class ComptePage extends StatelessWidget {
+class ComptePage extends StatefulWidget {
   final String nom;
   final String email;
   final String entreprise;
-  
+
   const ComptePage({
     super.key,
     required this.nom,
@@ -132,17 +132,117 @@ class ComptePage extends StatelessWidget {
   });
 
   @override
+  State<ComptePage> createState() => _ComptePageState();
+}
+
+class _ComptePageState extends State<ComptePage> {
+  late TextEditingController _nomController;
+  late TextEditingController _emailController;
+  late TextEditingController _entrepriseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nomController = TextEditingController(text: widget.nom);
+    _emailController = TextEditingController(text: widget.email);
+    _entrepriseController = TextEditingController(text: widget.entreprise);
+  }
+
+  @override
+  void dispose() {
+    _nomController.dispose();
+    _emailController.dispose();
+    _entrepriseController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    // Ajoute ici la logique d'enregistrement (API, local, etc.)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Modifications enregistrées !')),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Mon Compte")),
-    body: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text("Nom: $nom", style: const TextStyle(fontSize: 18)),
-          Text("Email: $email", style: const TextStyle(fontSize: 18)),
-          Text("Entreprise: $entreprise", style: const TextStyle(fontSize: 18)),
-        ],
+    appBar: AppBar(
+      title: const Text("Mon Compte"),
+      backgroundColor: Colors.white,
+      foregroundColor: Colors.black,
+      elevation: 1,
+      automaticallyImplyLeading: false,
+    ),
+    body: Center(
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: Colors.white,
+                child: CircleAvatar(
+                  radius: 44,
+                  backgroundColor: const Color(0xFF0057B8),
+                  child: Text(
+                    _nomController.text.isNotEmpty
+                        ? _nomController.text[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 40,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _nomController,
+                decoration: const InputDecoration(
+                  labelText: 'Nom',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _emailController,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _entrepriseController,
+                decoration: const InputDecoration(
+                  labelText: 'Entreprise',
+                  prefixIcon: Icon(Icons.business),
+                  border: OutlineInputBorder(),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _save,
+                  child: const Text('Enregistrer'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -160,14 +260,23 @@ class WelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset('assets/welcome.png', fit: BoxFit.cover),
-          Container(color: Colors.black.withAlpha(77)),
-          Center(
-            child: Column(
+  return Scaffold(
+    body: Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset('assets/welcome.png', fit: BoxFit.cover),
+        Container(color: Colors.black.withAlpha(77)),
+        Column(
+          children: [
+            // Mets l'image tibu.png en haut
+            const SizedBox(height: 48),
+            Image.asset(
+              'assets/tibu.png',
+              height: 120,
+            ),
+            const Spacer(),
+            // Contenu centralisé
+            Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Padding(
@@ -177,7 +286,7 @@ class WelcomePage extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 26,
+                      fontSize: 25,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -199,25 +308,25 @@ class WelcomePage extends StatelessWidget {
                     ),
                   ),
                 ),
-                 Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              // On ajoute un peu d'espace pour qu'elle ne soit pas collée au bord
-              padding: const EdgeInsets.only(bottom: 40.0), 
-              child: GestureDetector(
-                onTap: _launchInstagram,
-                child: Image.asset(
-                  'assets/instagram.png', // Assurez-vous que le chemin est bon
-                  height: 45,
-              ),
-               )
-                 )
-                )
               ],
             ),
+            const Spacer(),
+          ],
+        ),
+        // Icône Instagram en bas à gauche (ou à droite)
+        Positioned(
+          left: 24,
+          bottom: 24,
+          child: GestureDetector(
+            onTap: _launchInstagram,
+            child: Image.asset(
+              'assets/instagram.png',
+              height: 28,
+            ),
           ),
-        ],
-      ),
-    );
+        ),
+      ],
+    ),
+  );
   }
 }

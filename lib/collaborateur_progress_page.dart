@@ -36,6 +36,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
   double objectifDistance = 7.0;
 
   StreamSubscription<StepCount>? _stepCountStream;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -45,6 +46,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _stepCountStream?.cancel();
     super.dispose();
   }
@@ -68,16 +70,13 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = "Une erreur est survenue : ${e.toString().replaceAll("Exception: ", "")}";
+        _errorMessage = e.toString();
       });
     } finally {
       if (!mounted) return;
-      // On ne met _isLoading à false que si le podomètre n'a pas déjà affiché une erreur
-      if (_errorMessage == null || !_errorMessage!.contains("podomètre")) {
-          setState(() {
-            _isLoading = false;
-          });
-      }
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -102,35 +101,47 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
   }
 
   void _initPedometerForToday() {
-    pas = 0; // Réinitialiser les pas pour la vue "Aujourd'hui"
+    pas = 0;
     _stepCountStream?.cancel();
     _stepCountStream = Pedometer.stepCountStream.listen(
       (StepCount event) {
         if (!mounted) return;
         setState(() {
-          // MODIFIÉ : On efface le message d'erreur dès qu'on reçoit des données valides
-          if (_errorMessage != null) {
-            _errorMessage = null;
-          }
-          if (_isLoading) {
-            _isLoading = false;
-          }
           pas = event.steps;
           distance = _calculateDistance(pas);
           calories = _calculateCalories(pas);
+        });
+
+        if (_debounce?.isActive ?? false) _debounce!.cancel();
+        _debounce = Timer(const Duration(seconds: 15), () {
+          _sendStepsToBackend(pas);
         });
       },
       onError: (error) {
         if (!mounted) return;
         setState(() {
           _errorMessage = "Le podomètre n'est pas disponible sur cet appareil.";
-          _isLoading = false; // On arrête le chargement pour afficher l'erreur
         });
       },
-      // MODIFIÉ : Le paramètre cancelOnError est retiré (par défaut à false)
-      // pour permettre à l'écoute de continuer même après une erreur.
-      // cancelOnError: true, // CETTE LIGNE EST LE PROBLÈME, ON LA SUPPRIME
+      cancelOnError: true,
     );
+  }
+
+  Future<void> _sendStepsToBackend(int steps) async {
+    try {
+      final url = Uri.parse('http://192.168.11.140:9091/api/pas/update');
+      await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer ${widget.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'nombreDePas': steps}),
+      );
+      print('Pas envoyés au backend: $steps');
+    } catch (e) {
+      print('Erreur lors de l\'envoi des pas: $e');
+    }
   }
 
   Future<void> _fetchAggregatedProgress(String period) async {
@@ -209,23 +220,10 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
-              ? Center( // AJOUTÉ : Un affichage plus complet pour l'erreur
+              ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                         Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red, fontSize: 16)),
-                         const SizedBox(height: 20),
-                         // AJOUTÉ : Le bouton pour permettre une nouvelle tentative
-                         if (_errorMessage!.contains("podomètre"))
-                          ElevatedButton.icon(
-                            icon: Icon(Icons.refresh),
-                            label: Text("Réessayer"),
-                            onPressed: _initPedometerForToday,
-                          )
-                      ],
-                    ),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red, fontSize: 16)),
                   ),
                 )
               : ListView(
@@ -236,8 +234,6 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        Expanded(
-                         child:
                         _ProgressTab(
                           "Aujourd'hui",
                           _progressTabIndex == 0,
@@ -248,9 +244,6 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                             }
                           },
                         ),
-                        ),
-                        Expanded(
-                          child:
                         _ProgressTab(
                           "Cette semaine",
                           _progressTabIndex == 1,
@@ -261,9 +254,6 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                             }
                           },
                         ),
-                    ),
-                    Expanded(
-                       child:
                         _ProgressTab(
                           "Ce mois",
                           _progressTabIndex == 2,
@@ -274,7 +264,6 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                             }
                           },
                         ),
-                    ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -336,7 +325,6 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
   }
 }
 
-// Les classes _ProgressTab et _ProgressCard restent inchangées...
 class _ProgressTab extends StatelessWidget {
   final String label;
   final bool selected;
