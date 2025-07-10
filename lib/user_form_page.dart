@@ -1,11 +1,8 @@
-// fichier: lib/admin/user_form_page.dart
-
+import 'package:appli_tibu/services/api_service.dart'; // <<<--- IMPORT AJOUTÉ
 import 'package:flutter/material.dart';
 
 class UserFormPage extends StatefulWidget {
-  // On passe l'utilisateur à modifier. Si c'est null, on est en mode "Ajout".
-  final Map<String, String>? user;
-
+  final Map<String, dynamic>? user; // Doit être dynamic pour l'ID
   const UserFormPage({super.key, this.user});
 
   @override
@@ -13,44 +10,70 @@ class UserFormPage extends StatefulWidget {
 }
 
 class _UserFormPageState extends State<UserFormPage> {
+  // Les variables et fonctions doivent être DANS la classe State
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
   late TextEditingController _emailController;
-  late TextEditingController _companyController;
   late TextEditingController _passwordController;
+  bool _isLoading = false; // <<<--- VARIABLE AJOUTÉE
+
+  final ApiService _apiService = ApiService(); // <<<--- INSTANCE DÉPLACÉE ICI
 
   bool get _isEditing => widget.user != null;
 
   @override
   void initState() {
     super.initState();
-    // On pré-remplit les champs si on est en mode "Modification"
-    _nameController = TextEditingController(text: widget.user?['name']);
+    _firstNameController = TextEditingController(text: widget.user?['prenom']);
+    _lastNameController = TextEditingController(text: widget.user?['nom']);
     _emailController = TextEditingController(text: widget.user?['email']);
-    _companyController = TextEditingController(text: widget.user?['company']);
     _passwordController = TextEditingController();
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
-    _companyController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _saveForm() {
+  // La fonction de soumission doit être DANS la classe State
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // On crée un nouvel objet utilisateur avec les données du formulaire
-      final newUser = {
-        'name': _nameController.text,
-        'email': _emailController.text,
-        'company': _companyController.text,
-      };
+      setState(() => _isLoading = true);
 
-      // On renvoie l'utilisateur créé/modifié à la page précédente
-      Navigator.of(context).pop(newUser);
+      final Map<String, dynamic> userData = {
+        'prenom': _firstNameController.text,
+        'nom': _lastNameController.text,
+        'email': _emailController.text,
+      };
+      if (_passwordController.text.isNotEmpty) {
+        userData['password'] = _passwordController.text;
+      }
+
+      try {
+        if (_isEditing) {
+          await _apiService.updateAdmin(widget.user!['id'], userData);
+        } else {
+          await _apiService.createAdmin(userData);
+        }
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        if(mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: ${e.toString()}'))
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -58,7 +81,7 @@ class _UserFormPageState extends State<UserFormPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur'),
+        title: Text(_isEditing ? 'Modifier l\'administrateur' : 'Ajouter un administrateur'),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF3575D3),
       ),
@@ -69,8 +92,14 @@ class _UserFormPageState extends State<UserFormPage> {
           child: Column(
             children: [
               TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Nom complet'),
+                controller: _firstNameController,
+                decoration: const InputDecoration(labelText: 'Prénom'),
+                validator: (value) => value!.isEmpty ? 'Le prénom est requis' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _lastNameController,
+                decoration: const InputDecoration(labelText: 'Nom'),
                 validator: (value) => value!.isEmpty ? 'Le nom est requis' : null,
               ),
               const SizedBox(height: 16),
@@ -82,31 +111,25 @@ class _UserFormPageState extends State<UserFormPage> {
               ),
               const SizedBox(height: 16),
               TextFormField(
-                controller: _companyController,
-                decoration: const InputDecoration(labelText: 'Entreprise'),
-                validator: (value) => value!.isEmpty ? 'L\'entreprise est requise' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
                 controller: _passwordController,
                 decoration: InputDecoration(
                   labelText: 'Mot de passe',
-                  // On affiche une info si on modifie un utilisateur
                   hintText: _isEditing ? 'Laisser vide pour ne pas changer' : null,
                 ),
                 obscureText: true,
-                // Le mot de passe n'est requis que lors de la création
                 validator: (value) => !_isEditing && value!.isEmpty ? 'Le mot de passe est requis' : null,
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: _saveForm,
+                onPressed: _isLoading ? null : _submitForm,
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 50),
                   backgroundColor: const Color(0xFF3575D3),
                   foregroundColor: Colors.white,
                 ),
-                child: Text(_isEditing ? 'Sauvegarder' : 'Créer l\'utilisateur'),
+                child: _isLoading
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white))
+                    : Text(_isEditing ? 'Sauvegarder' : 'Créer l\'administrateur'),
               ),
             ],
           ),

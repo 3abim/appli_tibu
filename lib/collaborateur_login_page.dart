@@ -69,7 +69,7 @@ class _ConnexionFormState extends State<_ConnexionForm> {
     setState(() => _isLoading = true);
     
     try {
-      final url = Uri.parse('http://10.0.2.2:9091/api/auth/login');
+      final url = Uri.parse('http://192.168.11.140:9091/api/auth/login');
       print('Tentative de connexion à: $url');
       
       final response = await http.post(
@@ -217,7 +217,7 @@ class _InscriptionFormState extends State<_InscriptionForm> {
     setState(() => _isRegistering = true);
 
     try {
-      final url = Uri.parse('http://10.0.2.2:9091/api/auth/register');
+      final url = Uri.parse('http://192.168.11.140:9091/api/auth/register');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},

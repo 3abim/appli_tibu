@@ -18,6 +18,8 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   final ApiService _apiService = ApiService();
 
   Future<void> _login() async {
+    print('>>> DÉBUT LOGIN ADMIN: Clic sur le bouton détecté.');
+
     if (_isLoading) return;
     if (!_formKey.currentState!.validate()) {
       return;
@@ -86,7 +88,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Image.asset('assets/logo.png', height: 80),
+                Image.asset('assets/logo.png', height: 100),
                 const SizedBox(height: 24),
                 const Text(
                   'ADMINISTRATION',

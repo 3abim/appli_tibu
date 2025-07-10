@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'notifications_page.dart';
 
 const pantone2935C = Color(0xFF0057B8);
 const pantone368C = Color(0xFF39B54A);
@@ -60,7 +61,7 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
   }
 
   Future<void> _fetchUserData() async {
-    final url = Uri.parse('http://10.0.2.2:9091/api/collaborateur/dashboard');
+    final url = Uri.parse('http://192.168.11.140:9091/api/collaborateur/dashboard');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer ${widget.token}'},
@@ -89,7 +90,7 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
     final periods = ['jour', 'semaine', 'mois'];
     final period = periods[classementTabIndex];
     
-    final url = Uri.parse('http://10.0.2.2:9091/api/collaborateur/classement?periode=$period');
+    final url = Uri.parse('http://192.168.11.140:9091/api/collaborateur/classement?periode=$period');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer ${widget.token}'},
@@ -152,9 +153,15 @@ class _CollaborateurDashboardState extends State<CollaborateurDashboard> {
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_none),
+                icon: const Icon(Icons.notifications_outlined),
+                tooltip: 'Notifications',
                 onPressed: () {
-                  Navigator.pushNamed(context, '/notifications');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => NotificationsPage(),
+                    ),
+                  );
                 },
               ),
               Positioned(

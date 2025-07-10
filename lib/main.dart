@@ -6,8 +6,12 @@ import 'admin_dashboard_page.dart';
 import 'admin_shell_page.dart';
 import 'settings_page.dart';
 import 'collaborateur_progress_page.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('fr_FR', null);
   runApp(const MyApp());
 }
 
@@ -106,7 +110,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Pages conservées inchangées
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
   @override
@@ -145,11 +148,15 @@ class ComptePage extends StatelessWidget {
   );
 }
 
-// NOTE : La classe CollaborateurProgressPage a été supprimée d'ici.
-
-// Page d'accueil inchangée
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
+
+  void _launchInstagram() async {
+    final Uri url = Uri.parse('https://www.instagram.com/tibuafrica');
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      print('Could not launch $url');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -192,6 +199,20 @@ class WelcomePage extends StatelessWidget {
                     ),
                   ),
                 ),
+                 Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              // On ajoute un peu d'espace pour qu'elle ne soit pas collée au bord
+              padding: const EdgeInsets.only(bottom: 40.0), 
+              child: GestureDetector(
+                onTap: _launchInstagram,
+                child: Image.asset(
+                  'assets/instagram.png', // Assurez-vous que le chemin est bon
+                  height: 45,
+              ),
+               )
+                 )
+                )
               ],
             ),
           ),
@@ -199,4 +220,4 @@ class WelcomePage extends StatelessWidget {
       ),
     );
   }
-}                                           
+}

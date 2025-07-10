@@ -1,7 +1,6 @@
-// FICHIER COMPLET ET CORRIGÉ
 import 'package:flutter/material.dart';
-import 'services/api_service.dart'; // IMPORTANT: L'import du service API
-import 'dart:convert'; // IMPORTANT: Pour décoder le JSON
+import 'services/api_service.dart';
+import 'dart:convert';
 
 class AdminDashboardPage extends StatefulWidget {
   final String token;
@@ -12,30 +11,20 @@ class AdminDashboardPage extends StatefulWidget {
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  // --- NOUVEAU: Gestion de l'état et des données dynamiques ---
   final ApiService _apiService = ApiService();
   Map<String, dynamic>? _stats;
+  List<dynamic> _companyRanking = [];
   bool _isLoading = true;
   String? _errorMessage;
-
-  // --- Données qui restent pour l'instant statiques (à lier au backend plus tard) ---
-  int _classementTabIndex = 0;
-  final List<Map<String, dynamic>> _companyRanking = [
-    // TODO: Remplacer cette liste par un appel API
-    {'name': 'Tibu Inc.', 'steps': 8765432, 'logo': 'assets/logo.png'},
-    {'name': 'Innovate Corp.', 'steps': 2456789, 'logo': 'assets/logo.png'},
-    {'name': 'HealthFirst Ltd.', 'steps': 1321669, 'logo': 'assets/logo.png'},
-  ];
+  int _classementTabIndex = 0; // 0: jour, 1: semaine, 2: mois
 
   @override
   void initState() {
     super.initState();
-    // --- NOUVEAU: Appel à l'API au chargement de la page ---
-    _fetchDashboardData();
+    _fetchAllData();
   }
-
-  Future<void> _fetchDashboardData() async {
-    // Assurer que le widget est toujours monté avant de modifier l'état
+  
+  Future<void> _fetchAllData() async {
     if (!mounted) return;
     setState(() {
       _isLoading = true;
@@ -43,171 +32,86 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     });
 
     try {
-      final response = await _apiService.getAdminDashboardStats();
-      if (mounted) {
-        if (response.statusCode == 200) {
-          setState(() {
-            _stats = jsonDecode(response.body);
-          });
-        } else {
-          setState(() {
-            _errorMessage = "Erreur lors du chargement des données (${response.statusCode}).";
-          });
-        }
-      }
+      await Future.wait([
+        _fetchDashboardStats(),
+        _fetchClassement(),
+      ]);
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _errorMessage = "Impossible de joindre le serveur. Veuillez réessayer.";
-        });
+        setState(() => _errorMessage = e.toString().replaceFirst("Exception: ", ""));
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  void _convertStepsToMoney() {
-    // Utilise les données dynamiques si disponibles
-    final double totalEuros = _stats?['totalEuros']?.toDouble() ?? 0.0;
-    
-    showDialog(
+  Future<void> _fetchDashboardStats() async {
+    _stats = await _apiService.getAdminDashboardStats();
+  }
+
+  Future<void> _fetchClassement() async {
+    final periods = ['jour', 'semaine', 'mois'];
+    _companyRanking = await _apiService.getOrganisationClassement(periods[_classementTabIndex]);
+  }
+
+  Future<void> _convertStepsToMoney() async {
+    final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Conversion Effectuée'),
-        content: Text(
-            'Les pas ont été convertis en ${totalEuros.toStringAsFixed(2)}€ pour les écoles.'),
+        title: const Text('Confirmation de Conversion'),
+        content: const Text('Cette action est irréversible et réinitialisera les pas de tous les utilisateurs. Continuer ?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Annuler')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Confirmer', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    // --- NOUVEAU: Gérer l'affichage en fonction de l'état (chargement, erreur, succès) ---
-    if (_isLoading) {
-      return Scaffold(
-        appBar: _buildAppBar(),
-        body: const Center(child: CircularProgressIndicator()),
+    if (confirmed != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _apiService.convertSteps();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Conversion effectuée avec succès !'), backgroundColor: Colors.green),
       );
-    }
-
-    if (_errorMessage != null) {
-      return Scaffold(
-        appBar: _buildAppBar(),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
-                const SizedBox(height: 20),
-                ElevatedButton(onPressed: _fetchDashboardData, child: const Text("Réessayer")),
-              ],
-            ),
-          ),
-        ),
+      await _fetchAllData();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur: ${e.toString().replaceFirst("Exception: ", "")}'), backgroundColor: Colors.red),
       );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
-    
-    // --- MODIFIÉ: Utilisation des données dynamiques de l'API ---
-    final int totalSteps = _stats?['totalSteps']?.toInt() ?? 0;
-    final double totalEuros = _stats?['totalEuros']?.toDouble() ?? 0.0;
-
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: RefreshIndicator(
-        onRefresh: _fetchDashboardData,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    title: 'Total des Pas (toutes entreprises)',
-                    value: totalSteps.toString(), // Donnée dynamique
-                    icon: Icons.directions_walk,
-                    color: Colors.blue.shade700,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatCard(
-                    title: 'Total des Gains Générés',
-                    value: '€${totalEuros.toStringAsFixed(2)}', // Donnée dynamique
-                    icon: Icons.euro,
-                    color: Colors.green.shade700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.swap_horiz, color: Colors.white),
-              label: const Text('Convertir les Pas en Argent', style: TextStyle(color: Colors.white)),
-              onPressed: _convertStepsToMoney,
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: const Color(0xFF0057B8),
-                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 32),
-            Text(
-              'Classement des Entreprises',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                _buildRankingTab('Jour', 0),
-                const SizedBox(width: 8),
-                _buildRankingTab('Semaine', 1),
-                const SizedBox(width: 8),
-                _buildRankingTab('Mois', 2),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListView.separated(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: _companyRanking.length,
-              separatorBuilder: (context, index) => const Divider(),
-              itemBuilder: (context, index) {
-                final company = _companyRanking[index];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.grey.shade200,
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Image.asset(company['logo']),
-                    ),
-                  ),
-                  title: Text(company['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  trailing: Text(
-                    '${company['steps']} pas',
-                    style: TextStyle(color: Colors.blue.shade800, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
   }
   
-  // --- NOUVEAU: Extraction de l'AppBar pour éviter la duplication de code ---
+  void _onRankingTabTapped(int index) {
+    if (_isLoading) return;
+    setState(() {
+      _classementTabIndex = index;
+      _isLoading = true; 
+    });
+    _fetchClassement().catchError((e) {
+      if (mounted) setState(() => _errorMessage = e.toString());
+    }).whenComplete(() {
+      if (mounted) setState(() => _isLoading = false);
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: _buildAppBar(),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? _buildErrorView()
+              : _buildDashboardView(),
+    );
+  }
+
   AppBar _buildAppBar() {
     return AppBar(
       title: const Text('Dashboard Admin'),
@@ -216,16 +120,100 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       elevation: 1,
     );
   }
+  
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red, fontSize: 16)),
+            const SizedBox(height: 20),
+            ElevatedButton(onPressed: _fetchAllData, child: const Text("Réessayer")),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildDashboardView() {
+    final int totalSteps = _stats?['totalSteps']?.toInt() ?? 0;
+    final double totalEuros = _stats?['totalEuros']?.toDouble() ?? 0.0;
+
+    return RefreshIndicator(
+      onRefresh: _fetchAllData,
+      child: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildStatCard(title: 'Total des Pas', value: totalSteps.toString(), icon: Icons.directions_walk, color: Colors.blue.shade700)),
+              const SizedBox(width: 16),
+              Expanded(child: _buildStatCard(title: 'Gains Générés', value: '€${totalEuros.toStringAsFixed(2)}', icon: Icons.euro, color: Colors.green.shade700)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.swap_horiz, color: Colors.white),
+            label: const Text('Convertir les Pas en Argent', style: TextStyle(color: Colors.white)),
+            onPressed: _convertStepsToMoney,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              backgroundColor: const Color(0xFF0057B8),
+              textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text('Classement des Entreprises', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildRankingTab('Jour', 0),
+              const SizedBox(width: 8),
+              _buildRankingTab('Semaine', 1),
+              const SizedBox(width: 8),
+              _buildRankingTab('Mois', 2),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _companyRanking.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40.0),
+                child: Center(child: Text("Aucune donnée de pas pour cette période.", style: TextStyle(color: Colors.grey))),
+              )
+            : ListView.separated(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                itemCount: _companyRanking.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final company = _companyRanking[index];
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.grey.shade200,
+                      child: Text(
+                        (company['organisationName'] as String).isNotEmpty ? (company['organisationName'] as String)[0] : '?',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    title: Text(company['organisationName'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                    trailing: Text(
+                      '${company['totalSteps']} pas',
+                      style: TextStyle(color: Colors.blue.shade800, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  );
+                },
+              ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildRankingTab(String text, int index) {
     final bool isSelected = _classementTabIndex == index;
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _classementTabIndex = index;
-          // TODO: Appeler l'API pour mettre à jour le classement
-        });
-      },
+      onTap: () => _onRankingTabTapped(index),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(

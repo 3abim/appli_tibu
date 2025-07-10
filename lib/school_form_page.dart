@@ -1,9 +1,9 @@
+import 'package:appli_tibu/services/api_service.dart'; // <<<--- IMPORT AJOUTÉ
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Import pour le filtrage des entrées numériques
+import 'package:flutter/services.dart';
 
 class SchoolFormPage extends StatefulWidget {
   final Map<String, dynamic>? school;
-
   const SchoolFormPage({super.key, this.school});
 
   @override
@@ -11,47 +11,66 @@ class SchoolFormPage extends StatefulWidget {
 }
 
 class _SchoolFormPageState extends State<SchoolFormPage> {
+  // Les variables et fonctions doivent être DANS la classe State
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _cityController;
-  // --- NOUVEAU : On ajoute un controller pour le budget ---
   late TextEditingController _budgetController;
+  bool _isLoading = false; // <<<--- VARIABLE AJOUTÉE
+
+  final ApiService _apiService = ApiService(); // <<<--- INSTANCE DÉPLACÉE ICI
 
   bool get _isEditing => widget.school != null;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.school?['name'] ?? '');
-    _cityController = TextEditingController(text: widget.school?['city'] ?? '');
-    
-    // --- NOUVEAU : On initialise le controller du budget ---
-    // On convertit le double en String pour le champ de texte.
-    // Si c'est une nouvelle école, on laisse le champ vide.
-    _budgetController = TextEditingController(
-        text: _isEditing ? widget.school!['gains'].toString() : '');
+    _nameController = TextEditingController(text: widget.school?['nom'] ?? '');
+    _cityController = TextEditingController(text: widget.school?['ville'] ?? '');
+    // On utilise budgetEuros qui vient du DTO
+    final budget = widget.school?['budgetEuros'] as num?;
+    _budgetController = TextEditingController(text: budget?.toString() ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _cityController.dispose();
-    // --- NOUVEAU : On n'oublie pas de disposer le nouveau controller ---
     _budgetController.dispose();
     super.dispose();
   }
 
-  void _submitForm() {
+  // La fonction de soumission doit être DANS la classe State
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // --- MODIFIÉ : On récupère la valeur du budget depuis le controller ---
-      final newSchoolData = {
-        'name': _nameController.text,
-        'city': _cityController.text,
-        // On reconvertit le texte en double. Le validateur garantit que c'est possible.
-        'gains': double.parse(_budgetController.text), 
+      setState(() => _isLoading = true);
+
+      final schoolData = {
+        'nom': _nameController.text,
+        'ville': _cityController.text,
+        'budgetEuros': double.parse(_budgetController.text),
       };
 
-      Navigator.of(context).pop(newSchoolData);
+      try {
+        if (_isEditing) {
+          await _apiService.updateEcole(widget.school!['id'], schoolData);
+        } else {
+          await _apiService.createEcole(schoolData);
+        }
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erreur: ${e.toString()}'))
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -93,16 +112,13 @@ class _SchoolFormPageState extends State<SchoolFormPage> {
                 },
               ),
               const SizedBox(height: 16),
-              // --- NOUVEAU : Champ de formulaire pour le budget ---
               TextFormField(
                 controller: _budgetController,
                 decoration: const InputDecoration(
-                  labelText: 'Budget bénéficié',
+                  labelText: 'Budget',
                   suffixText: '€', 
                 ),
-                // On s'assure que le clavier est de type numérique
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                // On filtre pour n'autoriser que les chiffres et le point décimal
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
                 ],
@@ -121,15 +137,17 @@ class _SchoolFormPageState extends State<SchoolFormPage> {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: _submitForm,
+                onPressed: _isLoading ? null : _submitForm, // Désactive le bouton pdt le chargement
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF3575D3),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: Text(
-                  _isEditing ? 'Enregistrer les modifications' : 'Ajouter l\'école',
-                  style: const TextStyle(color: Colors.white),
-                ),
+                child: _isLoading 
+                    ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white))
+                    : Text(
+                        _isEditing ? 'Enregistrer les modifications' : 'Ajouter l\'école',
+                        style: const TextStyle(color: Colors.white),
+                      ),
               ),
             ],
           ),

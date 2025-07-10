@@ -82,7 +82,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
   }
 
   Future<void> _fetchCurrentObjectives() async {
-    final url = Uri.parse('http://10.0.2.2:9091/api/objectifs');
+    final url = Uri.parse('http://192.168.11.140:9091/api/objectifs');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer ${widget.token}'},
@@ -134,7 +134,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
   }
 
   Future<void> _fetchAggregatedProgress(String period) async {
-    final url = Uri.parse('http://10.0.2.2:9091/api/progress?periode=$period');
+    final url = Uri.parse('http://192.168.11.140:9091/api/progress?periode=$period');
     final response = await http.get(
       url,
       headers: {'Authorization': 'Bearer ${widget.token}'},
@@ -236,6 +236,8 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
+                        Expanded(
+                         child:
                         _ProgressTab(
                           "Aujourd'hui",
                           _progressTabIndex == 0,
@@ -246,6 +248,9 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                             }
                           },
                         ),
+                        ),
+                        Expanded(
+                          child:
                         _ProgressTab(
                           "Cette semaine",
                           _progressTabIndex == 1,
@@ -256,6 +261,9 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                             }
                           },
                         ),
+                    ),
+                    Expanded(
+                       child:
                         _ProgressTab(
                           "Ce mois",
                           _progressTabIndex == 2,
@@ -266,6 +274,7 @@ class _CollaborateurProgressPageState extends State<CollaborateurProgressPage> {
                             }
                           },
                         ),
+                    ),
                       ],
                     ),
                     const SizedBox(height: 24),

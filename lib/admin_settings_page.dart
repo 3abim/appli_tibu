@@ -1,6 +1,11 @@
-// fichier: lib/admin_settings_page.dart
-
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
+
+// Assurez-vous que le chemin relatif vers votre service est correct
+import '../services/api_service.dart';
 
 class AdminSettingsPage extends StatefulWidget {
   final String token;
@@ -13,6 +18,14 @@ class AdminSettingsPage extends StatefulWidget {
 
 class _AdminSettingsPageState extends State<AdminSettingsPage> {
   final _notificationController = TextEditingController();
+  final ApiService _apiService = ApiService();
+  bool _isDownloading = false;
+
+  @override
+  void dispose() {
+    _notificationController.dispose();
+    super.dispose();
+  }
 
   void _sendNotification() {
     if (_notificationController.text.isEmpty) {
@@ -24,39 +37,59 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       );
       return;
     }
-
-    // --- Logique pour envoyer la notification (simulation) ---
+    // TODO: Connecter à l'API
     print('Notification envoyée: "${_notificationController.text}"');
     
-    // Afficher une confirmation
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Notification envoyée avec succès !'),
         backgroundColor: Colors.green,
       ),
     );
-    
-    // Vider le champ de texte
     _notificationController.clear();
   }
 
-  void _exportReport(String reportType) {
-    // --- Logique pour exporter un rapport (simulation) ---
-    print('Exportation du rapport: "$reportType"');
-    
-    // Afficher une confirmation
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Exportation du rapport "$reportType" en cours...'),
-        backgroundColor: Colors.blue,
-      ),
-    );
-  }
+  Future<void> _exportReport(String reportType) async {
+    if (_isDownloading) return;
 
-  @override
-  void dispose() {
-    _notificationController.dispose();
-    super.dispose();
+    setState(() => _isDownloading = true);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    scaffoldMessenger.showSnackBar(
+      SnackBar(content: Text('Génération du rapport "$reportType" en cours...')),
+    );
+
+    try {
+      final Uint8List fileData;
+      final String fileName;
+
+      if (reportType == 'Utilisateurs') {
+        fileData = await _apiService.exportUsersReport();
+        fileName = 'rapport_utilisateurs_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      } else {
+        fileData = await _apiService.exportSchoolsReport();
+        fileName = 'rapport_ecoles_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      }
+
+      final directory = await getTemporaryDirectory();
+      final filePath = '${directory.path}/$fileName';
+      final file = File(filePath);
+
+      await file.writeAsBytes(fileData);
+      final result = await OpenFilex.open(filePath);
+
+      if (result.type != ResultType.done) {
+        throw Exception('Impossible d\'ouvrir le fichier: ${result.message}');
+      }
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Erreur: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+      }
+    }
   }
 
   @override
@@ -71,7 +104,6 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // --- Section Envoyer une Notification ---
           _buildSectionCard(
             title: 'Envoyer une Notification',
             icon: Icons.campaign,
@@ -107,10 +139,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
               ],
             ),
           ),
-
           const SizedBox(height: 24),
-
-          // --- Section Export de Rapports ---
           _buildSectionCard(
             title: 'Export de Rapports',
             icon: Icons.download,
@@ -125,7 +154,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                   leading: const Icon(Icons.people, color: Colors.blue),
                   title: const Text('Rapport des Utilisateurs'),
                   subtitle: const Text('Activité, classement, etc.'),
-                  trailing: const Icon(Icons.file_download_outlined),
+                  trailing: _isDownloading
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.file_download_outlined),
                   onTap: () => _exportReport('Utilisateurs'),
                 ),
                 const Divider(),
@@ -133,7 +164,9 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
                   leading: const Icon(Icons.school, color: Colors.green),
                   title: const Text('Rapport des Écoles'),
                   subtitle: const Text('Gains distribués, participation.'),
-                  trailing: const Icon(Icons.file_download_outlined),
+                  trailing: _isDownloading
+                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.file_download_outlined),
                   onTap: () => _exportReport('Écoles'),
                 ),
               ],
@@ -144,7 +177,6 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
     );
   }
 
-  // Widget pour construire les cartes de section
   Widget _buildSectionCard({
     required String title,
     required IconData icon,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http; // Ajout de l'import http
 import 'dart:convert'; // Ajout de l'import pour jsonEncode/jsonDecode
+import 'notifications_page.dart';
+
 
 class SettingsPage extends StatefulWidget {
   final String token;
@@ -52,7 +54,7 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse('http://10.0.2.2:9091/api/objectifs');
+      final url = Uri.parse('http://192.168.11.140:9091/api/objectifs');
       final response = await http.get(
         url,
         headers: {'Authorization': 'Bearer ${widget.token}'},
@@ -92,7 +94,7 @@ class _SettingsPageState extends State<SettingsPage> {
       });
 
       try {
-        final url = Uri.parse('http://10.0.2.2:9091/api/objectifs');
+        final url = Uri.parse('http://192.168.11.140:9091/api/objectifs');
         final response = await http.post(
           url,
           headers: {
@@ -168,9 +170,13 @@ class _SettingsPageState extends State<SettingsPage> {
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_none),
+                icon: const Icon(Icons.notifications_outlined),
+                tooltip: 'Notifications',
                 onPressed: () {
-                  Navigator.pushNamed(context, '/notifications');
+                 Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const NotificationsPage())
+                  );            
                 },
               ),
               Positioned(

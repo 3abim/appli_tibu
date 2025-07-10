@@ -1,8 +1,9 @@
-// Assurez-vous d'importer le nouveau formulaire
+import '../services/api_service.dart'; 
 import 'package:appli_tibu/school_form_page.dart';
 import 'package:appli_tibu/user_form_page.dart';
 import 'package:flutter/material.dart';
 
+// Le widget AdminManagementPage parent reste presque inchangé
 class AdminManagementPage extends StatefulWidget {
   final String token;
   final String role;
@@ -15,12 +16,7 @@ class AdminManagementPage extends StatefulWidget {
 class _AdminManagementPageState extends State<AdminManagementPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  // Clé pour l'onglet des utilisateurs (inchangé)
   final GlobalKey<_UsersManagementTabState> _usersTabKey = GlobalKey<_UsersManagementTabState>();
-  
-  // --- NOUVEAU : On crée une clé pour l'onglet des écoles ---
-  // Cela nous permettra d'appeler sa fonction d'ajout depuis le FloatingActionButton
   final GlobalKey<_SchoolsManagementTabState> _schoolsTabKey = GlobalKey<_SchoolsManagementTabState>();
 
   @override
@@ -33,6 +29,15 @@ class _AdminManagementPageState extends State<AdminManagementPage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+  
+  void _onAddButtonPressed() {
+    // La logique ici reste la même, elle délègue l'action à l'onglet actif
+    if (_tabController.index == 0) {
+      _usersTabKey.currentState?.navigateToForm();
+    } else {
+      _schoolsTabKey.currentState?.navigateToSchoolForm();
+    }
   }
 
   @override
@@ -49,7 +54,7 @@ class _AdminManagementPageState extends State<AdminManagementPage>
           unselectedLabelColor: Colors.grey,
           indicatorColor: const Color(0xFF3575D3),
           tabs: const [
-            Tab(icon: Icon(Icons.people), text: 'Utilisateurs'),
+            Tab(icon: Icon(Icons.people), text: 'Administrateurs'),
             Tab(icon: Icon(Icons.school), text: 'Écoles'),
           ],
         ),
@@ -58,20 +63,11 @@ class _AdminManagementPageState extends State<AdminManagementPage>
         controller: _tabController,
         children: [
           _UsersManagementTab(key: _usersTabKey, role: widget.role),
-          // --- MODIFIÉ : On passe la nouvelle clé à l'onglet des écoles ---
           _SchoolsManagementTab(key: _schoolsTabKey, role: widget.role),
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (_tabController.index == 0) {
-            // Logique pour ajouter un utilisateur (inchangé)
-            _usersTabKey.currentState?._navigateToForm();
-          } else {
-            // --- MODIFIÉ : On appelle la fonction d'ajout pour les écoles ---
-            _schoolsTabKey.currentState?._navigateToSchoolForm();
-          }
-        },
+        onPressed: _onAddButtonPressed,
         backgroundColor: const Color(0xFF3575D3),
         child: const Icon(Icons.add, color: Colors.white),
       ),
@@ -79,7 +75,8 @@ class _AdminManagementPageState extends State<AdminManagementPage>
   }
 }
 
-// --- WIDGET POUR L'ONGLET DE GESTION DES UTILISATEURS (INCHANGÉ) ---
+
+// --- WIDGET POUR L'ONGLET DE GESTION DES UTILISATEURS (REFAIT AVEC API) ---
 class _UsersManagementTab extends StatefulWidget {
   final String role;
   const _UsersManagementTab({super.key, required this.role});
@@ -89,52 +86,60 @@ class _UsersManagementTab extends StatefulWidget {
 }
 
 class _UsersManagementTabState extends State<_UsersManagementTab> {
-  final List<Map<String, String>> _users = [
-    {'name': 'Alice Martin', 'email': 'alice@tibu.ma', 'company': 'Tibu Inc.'},
-    {'name': 'Bob Durand', 'email': 'bob@innovate.com', 'company': 'Innovate Corp.'},
-    {'name': 'Charlie Dupont', 'email': 'charlie@health.com', 'company': 'HealthFirst Ltd.'},
-  ];
+  late Future<List<dynamic>> _usersFuture;
+  final ApiService _apiService = ApiService();
 
-  void _navigateToForm({Map<String, String>? user}) async {
-    if (!mounted) return;
-    final result = await Navigator.push<Map<String, String>>(
+  @override
+  void initState() {
+    super.initState();
+    _loadUsers();
+  }
+
+  void _loadUsers() {
+    setState(() {
+      _usersFuture = _apiService.getAdmins();
+    });
+  }
+
+  // Cette méthode est maintenant publique pour être appelée depuis le parent
+  void navigateToForm({Map<String, dynamic>? user}) async {
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
+        // On passe les données au format attendu par UserFormPage
         builder: (context) => UserFormPage(user: user),
       ),
     );
 
-    if (result != null) {
-      setState(() {
-        if (user == null) {
-          _users.add(result);
-        } else {
-          final index = _users.indexOf(user);
-          if (index != -1) {
-            _users[index] = result;
-          }
-        }
-      });
+    // Si le formulaire retourne true (succès), on recharge la liste
+    if (result == true) {
+      _loadUsers();
     }
   }
 
-  void _deleteUser(Map<String, String> user) {
-    showDialog(
+  void _deleteUser(String userId, String userName) {
+     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer la suppression'),
-        content: Text('Êtes-vous sûr de vouloir supprimer ${user['name']}?'),
+        content: Text('Êtes-vous sûr de vouloir supprimer $userName?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Annuler'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _users.remove(user);
-              });
-              Navigator.of(context).pop();
+            onPressed: () async {
+              try {
+                await _apiService.deleteAdmin(userId);
+                Navigator.of(context).pop();
+                _loadUsers(); // Recharger la liste
+              } catch (e) {
+                 Navigator.of(context).pop();
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   SnackBar(content: Text('Erreur: ${e.toString()}'))
+                 );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Supprimer'),
@@ -146,32 +151,51 @@ class _UsersManagementTabState extends State<_UsersManagementTab> {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: _users.length,
-      itemBuilder: (context, index) {
-        final user = _users[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.blue.shade100,
-              child: Text(user['name']![0]),
-            ),
-            title: Text(user['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${user['email']}\n${user['company']}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.orange.shade700),
-                  onPressed: () => _navigateToForm(user: user),
+    return FutureBuilder<List<dynamic>>(
+      future: _usersFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Erreur: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('Aucun administrateur trouvé.'));
+        }
+
+        final users = snapshot.data!;
+        return RefreshIndicator(
+          onRefresh: () async => _loadUsers(),
+          child: ListView.builder(
+            itemCount: users.length,
+            itemBuilder: (context, index) {
+              final user = users[index] as Map<String, dynamic>;
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue.shade100,
+                    child: Text(user['prenom']?[0] ?? '?'),
+                  ),
+                  title: Text('${user['prenom']} ${user['nom']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(user['email'] ?? ''),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.edit, color: Colors.orange.shade700),
+                        onPressed: () => navigateToForm(user: user),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red.shade700),
+                        onPressed: () => _deleteUser(user['id'], '${user['prenom']} ${user['nom']}'),
+                      ),
+                    ],
+                  ),
                 ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red.shade700),
-                  onPressed: () => _deleteUser(user),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         );
       },
@@ -179,9 +203,7 @@ class _UsersManagementTabState extends State<_UsersManagementTab> {
   }
 }
 
-// --- WIDGET POUR L'ONGLET DE GESTION DES ÉCOLES (ENTIÈREMENT REFAIT) ---
-
-
+// --- WIDGET POUR L'ONGLET DE GESTION DES ÉCOLES (REFAIT AVEC API) ---
 class _SchoolsManagementTab extends StatefulWidget {
   final String role;
   const _SchoolsManagementTab({super.key, required this.role});
@@ -191,52 +213,57 @@ class _SchoolsManagementTab extends StatefulWidget {
 }
 
 class _SchoolsManagementTabState extends State<_SchoolsManagementTab> {
-  final List<Map<String, dynamic>> _schools = [
-    {'name': 'École Al Amal', 'city': 'Casablanca', 'gains': 5250.50},
-    {'name': 'École Ibn Tofail', 'city': 'Rabat', 'gains': 3100.00},
-    {'name': 'École La Plume', 'city': 'Marrakech', 'gains': 4200.75},
-  ];
+  late Future<List<dynamic>> _schoolsFuture;
+  final ApiService _apiService = ApiService();
 
-  void _navigateToSchoolForm({Map<String, dynamic>? school}) async {
-    if (!mounted) return;
-    final result = await Navigator.push<Map<String, dynamic>>(
+  @override
+  void initState() {
+    super.initState();
+    _loadSchools();
+  }
+
+  void _loadSchools() {
+    setState(() {
+      _schoolsFuture = _apiService.getEcoles();
+    });
+  }
+
+  void navigateToSchoolForm({Map<String, dynamic>? school}) async {
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => SchoolFormPage(school: school),
       ),
     );
 
-    if (result != null) {
-      setState(() {
-        if (school == null) {
-          _schools.add(result);
-        } else {
-          final index = _schools.indexOf(school);
-          if (index != -1) {
-            _schools[index] = result;
-          }
-        }
-      });
+    if (result == true) {
+      _loadSchools();
     }
   }
 
-  void _deleteSchool(Map<String, dynamic> school) {
-    showDialog(
+  void _deleteSchool(String schoolId, String schoolName) {
+     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmer la suppression'),
-        content: Text('Êtes-vous sûr de vouloir supprimer ${school['name']}?'),
+        content: Text('Êtes-vous sûr de vouloir supprimer $schoolName?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Annuler'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                _schools.remove(school);
-              });
-              Navigator.of(context).pop();
+            onPressed: () async {
+              try {
+                await _apiService.deleteEcole(schoolId);
+                Navigator.of(context).pop();
+                _loadSchools();
+              } catch (e) {
+                 Navigator.of(context).pop();
+                 ScaffoldMessenger.of(context).showSnackBar(
+                   SnackBar(content: Text('Erreur: ${e.toString()}'))
+                 );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Supprimer'),
@@ -246,49 +273,67 @@ class _SchoolsManagementTabState extends State<_SchoolsManagementTab> {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: _schools.length,
-      itemBuilder: (context, index) {
-        final school = _schools[index];
-        return Card(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.green.shade100,
-              child: const Icon(Icons.school, color: Colors.green),
-            ),
-            title: Text(school['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-            
-            // --- MODIFIÉ : On utilise une Column dans le subtitle pour afficher la ville ET le budget ---
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(school['city']),
-                const SizedBox(height: 4),
-                Text(
-                  'Budget: ${(school['gains'] as double).toStringAsFixed(2)} MAD',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: Color.fromARGB(255, 39, 114, 42),
+    return FutureBuilder<List<dynamic>>(
+      future: _schoolsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Erreur: ${snapshot.error}'));
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(child: Text('Aucune école trouvée.'));
+        }
+
+        final schools = snapshot.data!;
+        return RefreshIndicator(
+          onRefresh: () async => _loadSchools(),
+          child: ListView.builder(
+            itemCount: schools.length,
+            itemBuilder: (context, index) {
+              final school = schools[index] as Map<String, dynamic>;
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.green.shade100,
+                    child: const Icon(Icons.school, color: Colors.green),
+                  ),
+                  title: Text(school['nom'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(school['ville']),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Budget: ${(school['budgetEuros'] as num? ?? 0).toStringAsFixed(2)} €',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Color.fromARGB(255, 39, 114, 42),
+                        ),
+                      ),
+                    ],
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.edit, color: Colors.orange.shade700),
+                        onPressed: () => navigateToSchoolForm(school: school),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red.shade700),
+                        onPressed: () => _deleteSchool(school['id'], school['nom']),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.edit, color: Colors.orange.shade700),
-                  onPressed: () => _navigateToSchoolForm(school: school),
-                ),
-                IconButton(
-                  icon: Icon(Icons.delete, color: Colors.red.shade700),
-                  onPressed: () => _deleteSchool(school),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         );
       },
