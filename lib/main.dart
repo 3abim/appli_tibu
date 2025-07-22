@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'collaborateur_login_page.dart';
+import 'collaborateur_login_page.dart' as login_page;
 import 'collaborateur_dashboard.dart';
 import 'admin_login_page.dart';
 import 'admin_dashboard_page.dart';
 import 'admin_shell_page.dart';
 import 'settings_page.dart';
-import 'collaborateur_progress_page.dart';
+import 'collaborateur_progress_page.dart'; // Ensure this file contains CollaborateurProgressPage
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'notifications_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Appli Tibu',
+      title: 'Step Up',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3575D3)),
         useMaterial3: true,
@@ -38,7 +39,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => const WelcomePage(),
-        '/login': (context) => const CollaborateurLoginPage(),
+        '/login': (context) => const login_page.CollaborateurLoginPage(),
         '/admin-login': (context) => const AdminLoginPage(),
         
         '/dashboard': (context) {
@@ -48,7 +49,7 @@ class MyApp extends StatelessWidget {
             token = args['token'];
           }
           if (token != null) {
-            return CollaborateurDashboard(token: token);
+            return CollaborateurDashboard(key: ValueKey(token), token: token);
           }
           return Scaffold(
             body: Center(
@@ -110,14 +111,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class NotificationsPage extends StatelessWidget {
-  const NotificationsPage({super.key});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text("Notifications")),
-    body: const Center(child: Text("Page des notifications")),
-  );
-}
+
 
 class ComptePage extends StatefulWidget {
   final String nom;
@@ -269,7 +263,7 @@ class WelcomePage extends StatelessWidget {
         Column(
           children: [
             // Mets l'image tibu.png en haut
-            const SizedBox(height: 48),
+            const SizedBox(height: 135), // 3 cm ≈ 85-90px, donc 135px pour être bien visible sur tous les écrans
             Image.asset(
               'assets/tibu.png',
               height: 120,

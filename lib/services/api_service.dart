@@ -9,7 +9,7 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  final String _baseUrl = 'http://192.168.11.140:9091';
+  final String _baseUrl = 'http://192.168.11.158:9091';
   String? _token;
 
   // Gestion centralisée des erreurs
@@ -74,7 +74,6 @@ class ApiService {
     await prefs.remove('jwt_token');
   }
 
-  // --- AUTHENTICATION ---
   Future<dynamic> login(String email, String password) async {
     final uri = Uri.parse('$_baseUrl/api/auth/login');
     final response = await http.post(
@@ -229,12 +228,18 @@ Future<dynamic> getAdminDashboardStats() async {
     final response = await http.get(uri, headers: await _getHeaders());
     return _handleResponse(response);
   }
+
+  Future<void> sendNotificationToAll(String message) async {
+  final uri = Uri.parse('$_baseUrl/api/admin/notifications');
+  final response = await http.post(
+    uri,
+    headers: await _getHeaders(),
+    body: jsonEncode({'message': message}),
+  );
+  _handleResponse(response);
+}
 }
 
-// Dans la classe ApiService, à la suite des autres méthodes
-
-
-// Classes d'exception personnalisées (elles doivent être en dehors de la classe ApiService)
 class AppException implements Exception {
   final String message;
   AppException(this.message);

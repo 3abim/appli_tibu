@@ -1,8 +1,8 @@
-import 'package:appli_tibu/services/api_service.dart'; // <<<--- IMPORT AJOUTÉ
+import 'package:appli_tibu/services/api_service.dart'; 
 import 'package:flutter/material.dart';
 
 class UserFormPage extends StatefulWidget {
-  final Map<String, dynamic>? user; // Doit être dynamic pour l'ID
+  final Map<String, dynamic>? user; 
   const UserFormPage({super.key, this.user});
 
   @override

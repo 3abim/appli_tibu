@@ -1,10 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Pour formater les dates
-
-// Assurez-vous que le chemin vers votre ApiService est correct
-// Si cette page est dans lib/collaborateur/ et le service dans lib/services/
-// le chemin '../services/api_service.dart' est correct.
-import '../services/api_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -14,29 +12,63 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  final ApiService _apiService = ApiService();
+  // On utilise un Future pour gérer l'état de la requête (chargement, erreur, succès)
   late Future<List<dynamic>> _notificationsFuture;
 
   @override
   void initState() {
     super.initState();
+    // On lance le chargement des notifications dès que la page est créée
     _loadNotifications();
   }
 
-  // Permet de recharger les données (pour le bouton "Réessayer" et le RefreshIndicator)
-  Future<void> _loadNotifications() async {
+  // Permet de recharger les données (utilisé pour le bouton "Réessayer" et le RefreshIndicator)
+  void _loadNotifications() {
     setState(() {
-      _notificationsFuture = _apiService.getNotifications();
+      _notificationsFuture = _fetchNotificationsFromServer();
     });
   }
 
-  // Fonction utilitaire pour formater la date de manière lisible
+  // La fonction qui fait l'appel API
+  Future<List<dynamic>> _fetchNotificationsFromServer() async {
+    // Récupérer le token stocké
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      throw Exception('Session invalide. Veuillez vous reconnecter.');
+    }
+
+    // N'oubliez pas de mettre votre IP ici
+    final url = Uri.parse('http://192.168.11.114:9091/api/notifications');
+    
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        // Si le serveur répond OK, on décode le JSON et on le retourne
+        return jsonDecode(response.body) as List<dynamic>;
+      } else {
+        throw Exception('Erreur serveur (${response.statusCode})');
+      }
+    } catch (e) {
+      throw Exception('Erreur de connexion. Vérifiez votre connexion internet.');
+    }
+  }
+
   String _formatDate(String isoDate) {
+    if (isoDate.isEmpty) return 'Date inconnue';
     try {
       final date = DateTime.parse(isoDate);
+
       return DateFormat('dd MMM yyyy à HH:mm', 'fr_FR').format(date);
     } catch (e) {
-      // Si la date est invalide, on retourne une chaîne vide ou un message d'erreur
       return 'Date invalide';
     }
   }
@@ -93,24 +125,26 @@ class _NotificationsPageState extends State<NotificationsPage> {
           // Cas 3: Les données sont arrivées, mais la liste est vide
           final notifications = snapshot.data ?? [];
           if (notifications.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            return RefreshIndicator(
+              onRefresh: () async => _loadNotifications(),
+              child: ListView( // On utilise un ListView pour que RefreshIndicator fonctionne
                 children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.3),
                   Icon(Icons.notifications_off_outlined, size: 60, color: Colors.grey[400]),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Aucune notification',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  const Center(
+                    child: Text(
+                      'Aucune notification pour le moment',
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
                   ),
                 ],
               ),
             );
           }
 
-          // Cas 4: On a des notifications, on les affiche dans une liste
           return RefreshIndicator(
-            onRefresh: _loadNotifications,
+            onRefresh: () async => _loadNotifications(),
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               itemCount: notifications.length,
@@ -130,7 +164,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     _formatDate(notification['createdAt'] ?? ''),
                     style: TextStyle(color: Colors.grey[600]),
                   ),
-                  isThreeLine: false, // S'assure que le layout est compact
                 );
               },
             ),

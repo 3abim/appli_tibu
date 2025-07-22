@@ -14,7 +14,7 @@ Future<void> submitRegistration({
     return;
   }
 
-  final url = Uri.parse('http://192.168.11.140:9091/api/auth/register');
+  final url = Uri.parse('http://1192.168.11.158:9091/api/auth/register');
   print('>>> FLUTTER DEBUG: URL cible: $url'); 
   final Map<String, dynamic> data = {
     'nom': nom,
@@ -59,7 +59,7 @@ Future<void> submitRegistration({
 }
 
 Future<void> sendStepsToBackend(String email, int steps) async {
-  final url = Uri.parse('http://192.168.11.140:9091/api/steps/update');
+  final url = Uri.parse('http://192.168.11.158:9091/api/steps/update');
 
   final response = await http.post(
     url,

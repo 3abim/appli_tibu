@@ -54,7 +54,7 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse('http://192.168.11.140:9091/api/objectifs');
+      final url = Uri.parse('http://192.168.11.158:9091/api/objectifs');
       final response = await http.get(
         url,
         headers: {'Authorization': 'Bearer ${widget.token}'},
@@ -94,7 +94,7 @@ class _SettingsPageState extends State<SettingsPage> {
       });
 
       try {
-        final url = Uri.parse('http://192.168.11.140:9091/api/objectifs');
+        final url = Uri.parse('http://192.168.11.158:9091/api/objectifs');
         final response = await http.post(
           url,
           headers: {
@@ -153,7 +153,7 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse('http://192.168.11.140:9091/api/objectifs/reset');
+      final url = Uri.parse('http://192.168.11.158:9091/api/objectifs/reset');
       final response = await http.post(
         url,
         headers: {'Authorization': 'Bearer ${widget.token}'},
